@@ -1,0 +1,47 @@
+# .NET
+bin/
+obj/
+out/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.userprefs
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+README.md
+AI_Guidelines.md
+DOCKER.md
+*.md
+
+# Scripts
+*.ps1
+*.sh
+
+# Logs
+*.log
+
+# Database (keep structure but not data)
+*.db
+*.db-journal
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test results
+TestResults/
+
+# NuGet
+*.nupkg

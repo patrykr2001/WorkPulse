@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: WorkPlanner.Api/Dockerfile
+    container_name: workplanner-api
+    ports:
+      - "7191:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/workplanner.db
+      - CORS__Origins__0=http://localhost:7127
+      - CORS__Origins__1=http://localhost:5027
+    volumes:
+      - ./data:/app/data
+    networks:
+      - workplanner-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  client:
+    build:
+      context: .
+      dockerfile: WorkPlanner.Client/Dockerfile
+      args:
+        - API_BASE_URL=http://localhost:7191
+    container_name: workplanner-client
+    ports:
+      - "7127:80"
+    environment:
+      - API_BASE_URL=http://localhost:7191
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - workplanner-network
+
+networks:
+  workplanner-network:
+    driver: bridge
+
+volumes:
+  data:
