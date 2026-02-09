@@ -58,12 +58,14 @@
     </MudAppBar>
     
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
-        <MudNavMenu>
-            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
-            <MudNavLink Href="tasks" Icon="@Icons.Material.Filled.Task">Tasks</MudNavLink>
-            <MudNavLink Href="timer" Icon="@Icons.Material.Filled.Timer">Timer</MudNavLink>
-            <MudNavLink Href="reports" Icon="@Icons.Material.Filled.Assessment">Reports</MudNavLink>
-        </MudNavMenu>
+            <MudNavMenu>
+                <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+                <MudNavLink Href="tasks" Icon="@Icons.Material.Filled.Task">Tasks</MudNavLink>
+                <MudNavLink Href="backlog" Icon="@Icons.Material.Filled.Inbox">Backlog</MudNavLink>
+                <MudNavLink Href="kanban" Icon="@Icons.Material.Filled.ViewKanban">Kanban</MudNavLink>
+                <MudNavLink Href="timer" Icon="@Icons.Material.Filled.Timer">Timer</MudNavLink>
+                <MudNavLink Href="reports" Icon="@Icons.Material.Filled.Assessment">Reports</MudNavLink>
+            </MudNavMenu>
     </MudDrawer>
     
     <MudMainContent>
