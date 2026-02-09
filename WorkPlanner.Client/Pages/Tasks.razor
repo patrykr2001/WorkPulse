@@ -4,4 +4,57 @@
 
 <MudText Typo="Typo.h3" GutterBottom="true">Tasks</MudText>
 
-<MudAlert Severity="Severity.Info">Task management will be implemented here.</MudAlert>
+<MudStack Spacing="2">
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+        <MudSelect T="int" Label="Project" Dense="true" @bind-Value="SelectedProjectId" @bind-Value:after="OnFiltersChanged">
+            <MudSelectItem T="int" Value="0">All projects</MudSelectItem>
+            @foreach (var project in Projects)
+            {
+                <MudSelectItem T="int" Value="project.Id">@project.Name</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="int" Label="Sprint" Dense="true" @bind-Value="SelectedSprintId" @bind-Value:after="OnFiltersChanged" Disabled="SelectedProjectId == 0">
+            <MudSelectItem T="int" Value="0">All sprints</MudSelectItem>
+            @foreach (var sprint in Sprints)
+            {
+                <MudSelectItem T="int" Value="sprint.Id">@sprint.Name</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="WorkPlanner.Client.Models.TaskStatus" Label="Status" Dense="true" @bind-Value="SelectedStatus" @bind-Value:after="OnFiltersChanged">
+            <MudSelectItem T="WorkPlanner.Client.Models.TaskStatus" Value="WorkPlanner.Client.Models.TaskStatus.Backlog">Backlog</MudSelectItem>
+            <MudSelectItem T="WorkPlanner.Client.Models.TaskStatus" Value="WorkPlanner.Client.Models.TaskStatus.Todo">Todo</MudSelectItem>
+            <MudSelectItem T="WorkPlanner.Client.Models.TaskStatus" Value="WorkPlanner.Client.Models.TaskStatus.InProgress">In Progress</MudSelectItem>
+            <MudSelectItem T="WorkPlanner.Client.Models.TaskStatus" Value="WorkPlanner.Client.Models.TaskStatus.Done">Done</MudSelectItem>
+        </MudSelect>
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenNewTaskDialog">New task</MudButton>
+    </MudStack>
+
+    @if (MyTasks.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No tasks assigned to you.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="FilteredTasks" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Title</MudTh>
+                <MudTh>Project</MudTh>
+                <MudTh>Sprint</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Order</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Title">
+                    <MudLink OnClick="(() => OpenTaskDialog(context))">@context.Title</MudLink>
+                </MudTd>
+                <MudTd DataLabel="Project">@GetProjectName(context.ProjectId)</MudTd>
+                <MudTd DataLabel="Sprint">@GetSprintName(context.SprintId)</MudTd>
+                <MudTd DataLabel="Status">@context.Status</MudTd>
+                <MudTd DataLabel="Order">@context.Order</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudStack>

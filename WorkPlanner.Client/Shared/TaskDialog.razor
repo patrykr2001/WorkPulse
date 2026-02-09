@@ -1,0 +1,175 @@
+@namespace WorkPlanner.Client.Shared
+@using WorkPlanner.Client.Models
+@using WorkPlanner.Client.Services
+@using MudBlazor
+@using TaskStatus = WorkPlanner.Client.Models.TaskStatus;
+@inject ProjectService ProjectService
+@inject SprintService SprintService
+@inject TaskService TaskService
+@inject AuthService AuthService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">@DialogTitle</MudText>
+
+            <MudTextField @bind-Value="Model.Title" Label="Title" Required="true" />
+            <MudTextField @bind-Value="Model.Description" Label="Description" Lines="3" />
+
+            <MudSelect T="int" Label="Project" @bind-Value="SelectedProjectId">
+                @foreach (var project in Projects)
+                {
+                    <MudSelectItem T="int" Value="project.Id">@project.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="int" Label="Sprint" @bind-Value="SelectedSprintId">
+                <MudSelectItem T="int" Value="0">Backlog</MudSelectItem>
+                @foreach (var sprint in Sprints)
+                {
+                    <MudSelectItem T="int" Value="sprint.Id">@sprint.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="TaskStatus" Label="Status" @bind-Value="Model.Status">
+                <MudSelectItem T="TaskStatus" Value="TaskStatus.Backlog">Backlog</MudSelectItem>
+                <MudSelectItem T="TaskStatus" Value="TaskStatus.Todo">Todo</MudSelectItem>
+                <MudSelectItem T="TaskStatus" Value="TaskStatus.InProgress">In Progress</MudSelectItem>
+                <MudSelectItem T="TaskStatus" Value="TaskStatus.Done">Done</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="string" Label="Assignee" @bind-Value="Model.AssigneeId">
+                <MudSelectItem T="string" Value="@string.Empty">Unassigned</MudSelectItem>
+                @foreach (var member in Members)
+                {
+                    <MudSelectItem T="string" Value="member.UserId">@member.FullName</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    public const string DialogTitleKey = "Task";
+    [Parameter] public TaskItem? Task { get; set; }
+
+    private TaskItem Model { get; set; } = new();
+    private string DialogTitle => Task == null ? "New task" : "Edit task";
+
+    private List<Project> Projects { get; set; } = new();
+    private List<Sprint> Sprints { get; set; } = new();
+    private List<ProjectMember> Members { get; set; } = new();
+
+    private int SelectedProjectId
+    {
+        get => Model.ProjectId;
+        set
+        {
+            if (Model.ProjectId == value)
+            {
+                return;
+            }
+
+            Model.ProjectId = value;
+            _ = LoadProjectDataAsync();
+        }
+    }
+
+    private int SelectedSprintId
+    {
+        get => Model.SprintId ?? 0;
+        set
+        {
+            Model.SprintId = value == 0 ? null : value;
+            if (Model.SprintId == null)
+            {
+                Model.Status = TaskStatus.Backlog;
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Projects = await ProjectService.GetProjectsAsync();
+
+        if (Task != null)
+        {
+            Model = new TaskItem
+            {
+                Id = Task.Id,
+                ProjectId = Task.ProjectId,
+                Title = Task.Title,
+                Description = Task.Description,
+                Status = Task.Status,
+                CreatedAt = Task.CreatedAt,
+                CompletedAt = Task.CompletedAt,
+                AssigneeId = Task.AssigneeId,
+                SprintId = Task.SprintId,
+                Order = Task.Order
+            };
+        }
+        else if (Projects.Count > 0)
+        {
+            Model.ProjectId = Projects[0].Id;
+        }
+
+        await LoadProjectDataAsync();
+
+        if (string.IsNullOrWhiteSpace(Model.AssigneeId))
+        {
+            Model.AssigneeId = AuthService.CurrentUser?.Id;
+        }
+    }
+
+    private async Task LoadProjectDataAsync()
+    {
+        if (Model.ProjectId <= 0)
+        {
+            Sprints = new List<Sprint>();
+            Members = new List<ProjectMember>();
+            return;
+        }
+
+        Sprints = await SprintService.GetSprintsAsync(Model.ProjectId, includeArchived: false);
+        Members = await ProjectService.GetMembersAsync(Model.ProjectId);
+
+        if (Model.SprintId.HasValue && Sprints.All(s => s.Id != Model.SprintId.Value))
+        {
+            Model.SprintId = null;
+            Model.Status = TaskStatus.Backlog;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(Model.Title) || Model.ProjectId <= 0)
+        {
+            return;
+        }
+
+        if (Model.SprintId == null)
+        {
+            Model.Status = TaskStatus.Backlog;
+        }
+
+        if (Task == null)
+        {
+            await TaskService.CreateTaskAsync(Model);
+        }
+        else
+        {
+            await TaskService.UpdateTaskAsync(Model);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}
