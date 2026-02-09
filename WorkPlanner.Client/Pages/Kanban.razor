@@ -33,6 +33,16 @@
         }
     </MudSelect>
 
+    <MudSelect T="string" Label="Assignee" Dense="true" @bind-Value="SelectedAssigneeId">
+        <MudSelectItem T="string" Value="@AssigneeFilterAll">All</MudSelectItem>
+        <MudSelectItem T="string" Value="@AssigneeFilterMe">Me</MudSelectItem>
+        <MudSelectItem T="string" Value="@AssigneeFilterUnassigned">Unassigned</MudSelectItem>
+        @foreach (var member in Members)
+        {
+            <MudSelectItem T="string" Value="member.UserId">@member.FullName</MudSelectItem>
+        }
+    </MudSelect>
+
     <MudStack Spacing="2">
         <MudText Typo="Typo.subtitle1">Sprint tasks</MudText>
         <MudPaper Class="pa-4" Style="min-height: 120px;">
@@ -52,7 +62,7 @@
                         <MudPaper Class="pa-3" Style="min-height: 140px;"
                                   @ondragover:preventDefault
                                   @ondrop="(() => OnDropToColumn(WorkPlanner.Client.Models.TaskStatus.Todo))">
-                            @foreach (var task in SprintTasks.Where(t => t.Status == WorkPlanner.Client.Models.TaskStatus.Todo).OrderBy(t => t.Order))
+                            @foreach (var task in FilteredColumnTasks(WorkPlanner.Client.Models.TaskStatus.Todo))
                             {
                                 <div class="pa-2 mb-2" draggable="true"
                                      @ondragstart="(() => OnDragStart(task))">
@@ -66,7 +76,7 @@
                         <MudPaper Class="pa-3" Style="min-height: 140px;"
                                   @ondragover:preventDefault
                                   @ondrop="(() => OnDropToColumn(WorkPlanner.Client.Models.TaskStatus.InProgress))">
-                            @foreach (var task in SprintTasks.Where(t => t.Status == WorkPlanner.Client.Models.TaskStatus.InProgress).OrderBy(t => t.Order))
+                            @foreach (var task in FilteredColumnTasks(WorkPlanner.Client.Models.TaskStatus.InProgress))
                             {
                                 <div class="pa-2 mb-2" draggable="true"
                                      @ondragstart="(() => OnDragStart(task))">
@@ -80,7 +90,7 @@
                         <MudPaper Class="pa-3" Style="min-height: 140px;"
                                   @ondragover:preventDefault
                                   @ondrop="(() => OnDropToColumn(WorkPlanner.Client.Models.TaskStatus.Done))">
-                            @foreach (var task in SprintTasks.Where(t => t.Status == WorkPlanner.Client.Models.TaskStatus.Done).OrderBy(t => t.Order))
+                            @foreach (var task in FilteredColumnTasks(WorkPlanner.Client.Models.TaskStatus.Done))
                             {
                                 <div class="pa-2 mb-2" draggable="true"
                                      @ondragstart="(() => OnDragStart(task))">

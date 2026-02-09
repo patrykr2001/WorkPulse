@@ -9,6 +9,9 @@ namespace WorkPlanner.Client.Pages;
 
 public partial class Backlog : ComponentBase
 {
+    protected const string AssigneeFilterAll = "all";
+    protected const string AssigneeFilterMe = "me";
+    protected const string AssigneeFilterUnassigned = "unassigned";
     [Inject] private ProjectService ProjectService { get; set; } = null!;
     [Inject] private SprintService SprintService { get; set; } = null!;
     [Inject] private TaskService TaskService { get; set; } = null!;
@@ -36,6 +39,8 @@ public partial class Backlog : ComponentBase
     protected List<Sprint> Sprints { get; private set; } = new();
     protected List<TaskItem> BacklogTasks { get; private set; } = new();
     protected Dictionary<int, List<TaskItem>> SprintTasks { get; private set; } = new();
+    protected List<ProjectMember> Members { get; private set; } = new();
+    protected string SelectedAssigneeId { get; set; } = AssigneeFilterAll;
     private TaskItem? _draggedTask;
     protected bool IsUnauthorized { get; private set; }
 
@@ -72,11 +77,40 @@ public partial class Backlog : ComponentBase
         await LoadSprintDataAsync();
     }
 
+    [Inject] private AuthService AuthService { get; set; } = null!;
+
+    protected IEnumerable<TaskItem> FilteredBacklogTasks => BacklogTasks
+        .Where(ApplyAssigneeFilter)
+        .OrderBy(t => t.Order);
+
+    protected IEnumerable<TaskItem> FilteredSprintTasks(int sprintId)
+    {
+        if (!SprintTasks.TryGetValue(sprintId, out var tasks))
+        {
+            return Enumerable.Empty<TaskItem>();
+        }
+
+        return tasks.Where(ApplyAssigneeFilter).OrderBy(t => t.Order);
+    }
+
+    private bool ApplyAssigneeFilter(TaskItem task)
+    {
+        return SelectedAssigneeId switch
+        {
+            AssigneeFilterAll => true,
+            AssigneeFilterMe => task.AssigneeId == AuthService.CurrentUser?.Id,
+            AssigneeFilterUnassigned => string.IsNullOrWhiteSpace(task.AssigneeId),
+            _ => task.AssigneeId == SelectedAssigneeId
+        };
+    }
+
     private async Task LoadSprintDataAsync()
     {
         Sprints = await SprintService.GetSprintsAsync(SelectedProjectId, includeArchived: false);
         BacklogTasks = await TaskService.GetTasksAsync(SelectedProjectId, sprintId: null);
         IsUnauthorized = Projects.Count == 0 && BacklogTasks.Count == 0 && Sprints.Count == 0;
+        Members = await ProjectService.GetMembersAsync(SelectedProjectId);
+        SelectedAssigneeId = AssigneeFilterAll;
         SprintTasks = new Dictionary<int, List<TaskItem>>();
 
         foreach (var sprint in Sprints)

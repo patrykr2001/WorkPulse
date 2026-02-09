@@ -8,9 +8,13 @@ namespace WorkPlanner.Client.Pages;
 
 public partial class Kanban : ComponentBase
 {
+    protected const string AssigneeFilterAll = "all";
+    protected const string AssigneeFilterMe = "me";
+    protected const string AssigneeFilterUnassigned = "unassigned";
     [Inject] private ProjectService ProjectService { get; set; } = null!;
     [Inject] private SprintService SprintService { get; set; } = null!;
     [Inject] private TaskService TaskService { get; set; } = null!;
+    [Inject] private AuthService AuthService { get; set; } = null!;
     [Inject] private IJSRuntime JsRuntime { get; set; } = null!;
 
     private const string SelectedProjectStorageKey = "workplanner.selectedProjectId";
@@ -33,6 +37,8 @@ public partial class Kanban : ComponentBase
     private int _selectedProjectId;
 
     protected List<Sprint> Sprints { get; private set; } = new();
+    protected List<ProjectMember> Members { get; private set; } = new();
+    protected string SelectedAssigneeId { get; set; } = AssigneeFilterAll;
     protected int SelectedSprintId
     {
         get => _selectedSprintId;
@@ -89,6 +95,8 @@ public partial class Kanban : ComponentBase
     private async Task LoadSprintsAsync()
     {
         Sprints = await SprintService.GetSprintsAsync(SelectedProjectId, includeArchived: false);
+        Members = await ProjectService.GetMembersAsync(SelectedProjectId);
+        SelectedAssigneeId = AssigneeFilterAll;
 
         var activeSprint = Sprints.FirstOrDefault(s => s.IsActive);
         if (activeSprint != null)
@@ -130,6 +138,25 @@ public partial class Kanban : ComponentBase
         SprintTasks = await TaskService.GetTasksAsync(SelectedProjectId, SelectedSprintId);
         IsUnauthorized = Projects.Count == 0 && Sprints.Count == 0 && SprintTasks.Count == 0;
         StateHasChanged();
+    }
+
+    protected IEnumerable<TaskItem> FilteredColumnTasks(TaskStatus status)
+    {
+        return SprintTasks
+            .Where(t => t.Status == status)
+            .Where(ApplyAssigneeFilter)
+            .OrderBy(t => t.Order);
+    }
+
+    private bool ApplyAssigneeFilter(TaskItem task)
+    {
+        return SelectedAssigneeId switch
+        {
+            AssigneeFilterAll => true,
+            AssigneeFilterMe => task.AssigneeId == AuthService.CurrentUser?.Id,
+            AssigneeFilterUnassigned => string.IsNullOrWhiteSpace(task.AssigneeId),
+            _ => task.AssigneeId == SelectedAssigneeId
+        };
     }
 
     protected void OnDragStart(TaskItem task)
