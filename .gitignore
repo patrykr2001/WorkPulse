@@ -428,4 +428,7 @@ FodyWeavers.xsd
 *.msp
 
 AI_Guidelines.md
-*db*
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
