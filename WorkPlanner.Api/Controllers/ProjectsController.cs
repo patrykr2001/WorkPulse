@@ -147,14 +147,19 @@ public class ProjectsController : ControllerBase
             return Forbid();
         }
 
-        var memberUser = await _userManager.FindByIdAsync(request.UserId);
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return BadRequest("Email is required.");
+        }
+
+        var memberUser = await _userManager.FindByEmailAsync(request.Email.Trim());
         if (memberUser == null)
         {
             return NotFound("User not found.");
         }
 
         var exists = await _context.ProjectMembers
-            .AnyAsync(m => m.ProjectId == id && m.UserId == request.UserId);
+            .AnyAsync(m => m.ProjectId == id && m.UserId == memberUser.Id);
 
         if (exists)
         {
@@ -164,10 +169,77 @@ public class ProjectsController : ControllerBase
         _context.ProjectMembers.Add(new ProjectMember
         {
             ProjectId = id,
-            UserId = request.UserId,
+            UserId = memberUser.Id,
             Role = ProjectRole.Member,
             JoinedAt = DateTime.UtcNow
         });
+
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpGet("{id:int}/members")]
+    public async Task<ActionResult<IEnumerable<ProjectMemberDto>>> GetMembers(int id)
+    {
+        var userId = GetUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var hasAccess = await _context.ProjectMembers
+            .AnyAsync(m => m.ProjectId == id && m.UserId == userId);
+
+        if (!hasAccess)
+        {
+            return Forbid();
+        }
+
+        var members = await _context.ProjectMembers
+            .AsNoTracking()
+            .Where(m => m.ProjectId == id)
+            .Select(m => new ProjectMemberDto
+            {
+                UserId = m.UserId,
+                Email = m.User.Email ?? string.Empty,
+                FirstName = m.User.FirstName,
+                LastName = m.User.LastName,
+                Role = m.Role
+            })
+            .ToListAsync();
+
+        return members;
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> UpdateProject(int id, UpdateProjectRequest request)
+    {
+        var userId = GetUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var project = await _context.Projects
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (project == null)
+        {
+            return NotFound();
+        }
+
+        if (project.OwnerId != userId)
+        {
+            return Forbid();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return BadRequest("Project name is required.");
+        }
+
+        project.Name = request.Name.Trim();
+        project.IsArchived = request.IsArchived;
 
         await _context.SaveChangesAsync();
         return NoContent();
@@ -226,7 +298,22 @@ public class CreateProjectRequest
 
 public class AddProjectMemberRequest
 {
+    public string Email { get; set; } = string.Empty;
+}
+
+public class UpdateProjectRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public bool IsArchived { get; set; }
+}
+
+public class ProjectMemberDto
+{
     public string UserId { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public ProjectRole Role { get; set; }
 }
 
 public class ProjectDto
