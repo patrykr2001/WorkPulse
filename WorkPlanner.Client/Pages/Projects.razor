@@ -1,0 +1,94 @@
+@page "/projects"
+
+<PageTitle>Projects - WorkPulse</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Projects</MudText>
+
+<MudStack Spacing="2">
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+        <MudTextField @bind-Value="NewProjectName" Label="New project name" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateProject">Create</MudButton>
+        <label class="mud-input-helper-text">Show archived</label>
+        <input type="checkbox" @bind="ShowArchived" />
+    </MudStack>
+
+    @if (ProjectList.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No projects yet.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="FilteredProjects" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Owner</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">
+                    @if (EditingProjectId == context.Id)
+                    {
+                        <MudTextField @bind-Value="EditProjectName" Margin="Margin.Dense" />
+                    }
+                    else
+                    {
+                        @context.Name
+                    }
+                </MudTd>
+                <MudTd DataLabel="Owner">@context.OwnerId</MudTd>
+                <MudTd DataLabel="Status">@(context.IsArchived ? "Archived" : "Active")</MudTd>
+                <MudTd>
+                    @if (EditingProjectId == context.Id)
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="(() => SaveProject(context))">Save</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="CancelEdit">Cancel</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="(() => StartEdit(context))">Edit</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="(() => ToggleArchive(context))">
+                            @(context.IsArchived ? "Unarchive" : "Archive")
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="(() => SelectProject(context))">Members</MudButton>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+
+    @if (SelectedProject != null)
+    {
+        <MudDivider />
+        <MudText Typo="Typo.h5">Members - @SelectedProject.Name</MudText>
+
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudTextField @bind-Value="NewMemberEmail" Label="User email" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddMember">Add member</MudButton>
+        </MudStack>
+
+        @if (Members.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">No members.</MudText>
+        }
+        else
+        {
+            <MudTable Items="Members" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh>Role</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.FullName</MudTd>
+                    <MudTd DataLabel="Email">@context.Email</MudTd>
+                    <MudTd DataLabel="Role">@context.Role</MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text" Color="Color.Error" Disabled="@((context.Role == ProjectRole.Owner))" OnClick="(() => RemoveMember(context))">Remove</MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    }
+</MudStack>
