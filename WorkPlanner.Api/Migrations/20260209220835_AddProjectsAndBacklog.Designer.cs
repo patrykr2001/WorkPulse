@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WorkPlanner.Api.Data;
 
@@ -10,9 +11,11 @@ using WorkPlanner.Api.Data;
 namespace WorkPlanner.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260209220835_AddProjectsAndBacklog")]
+    partial class AddProjectsAndBacklog
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.2");
@@ -220,6 +223,33 @@ namespace WorkPlanner.Api.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("WorkPlanner.Api.Models.BacklogItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TaskItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("TaskItemId");
+
+                    b.ToTable("BacklogItems");
+                });
+
             modelBuilder.Entity("WorkPlanner.Api.Models.Project", b =>
                 {
                     b.Property<int>("Id")
@@ -269,45 +299,6 @@ namespace WorkPlanner.Api.Migrations
                     b.ToTable("ProjectMembers");
                 });
 
-            modelBuilder.Entity("WorkPlanner.Api.Models.Sprint", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsArchived")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId");
-
-                    b.ToTable("Sprints");
-                });
-
             modelBuilder.Entity("WorkPlanner.Api.Models.TaskItem", b =>
                 {
                     b.Property<int>("Id")
@@ -328,13 +319,7 @@ namespace WorkPlanner.Api.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Order")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int?>("ProjectId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("SprintId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")
@@ -350,8 +335,6 @@ namespace WorkPlanner.Api.Migrations
                     b.HasIndex("AssigneeId");
 
                     b.HasIndex("ProjectId");
-
-                    b.HasIndex("SprintId");
 
                     b.ToTable("TaskItems");
                 });
@@ -437,6 +420,25 @@ namespace WorkPlanner.Api.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("WorkPlanner.Api.Models.BacklogItem", b =>
+                {
+                    b.HasOne("WorkPlanner.Api.Models.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WorkPlanner.Api.Models.TaskItem", "TaskItem")
+                        .WithMany()
+                        .HasForeignKey("TaskItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+
+                    b.Navigation("TaskItem");
+                });
+
             modelBuilder.Entity("WorkPlanner.Api.Models.Project", b =>
                 {
                     b.HasOne("WorkPlanner.Api.Models.ApplicationUser", "Owner")
@@ -467,17 +469,6 @@ namespace WorkPlanner.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("WorkPlanner.Api.Models.Sprint", b =>
-                {
-                    b.HasOne("WorkPlanner.Api.Models.Project", "Project")
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
-                });
-
             modelBuilder.Entity("WorkPlanner.Api.Models.TaskItem", b =>
                 {
                     b.HasOne("WorkPlanner.Api.Models.ApplicationUser", "Assignee")
@@ -490,16 +481,9 @@ namespace WorkPlanner.Api.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("WorkPlanner.Api.Models.Sprint", "Sprint")
-                        .WithMany("Tasks")
-                        .HasForeignKey("SprintId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Assignee");
 
                     b.Navigation("Project");
-
-                    b.Navigation("Sprint");
                 });
 
             modelBuilder.Entity("WorkPlanner.Api.Models.WorkEntry", b =>
@@ -517,11 +501,6 @@ namespace WorkPlanner.Api.Migrations
                 {
                     b.Navigation("Members");
 
-                    b.Navigation("Tasks");
-                });
-
-            modelBuilder.Entity("WorkPlanner.Api.Models.Sprint", b =>
-                {
                     b.Navigation("Tasks");
                 });
 

@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WorkPlanner.Api.Data;
@@ -6,6 +8,7 @@ namespace WorkPlanner.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class SummariesController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -18,12 +21,21 @@ public class SummariesController : ControllerBase
     [HttpGet("daily")]
     public async Task<ActionResult<IEnumerable<DailySummary>>> GetDailySummary([FromQuery] DateTime? date)
     {
+        var userId = GetUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
         var targetDate = date?.Date ?? DateTime.UtcNow.Date;
         var nextDay = targetDate.AddDays(1);
 
         var entries = await _context.WorkEntries
             .Where(we => we.StartTime >= targetDate && we.StartTime < nextDay && we.EndTime != null)
+            .Where(we => we.TaskItem.ProjectId.HasValue)
+            .Where(we => we.TaskItem.Project!.Members.Any(m => m.UserId == userId))
             .Include(we => we.TaskItem)
+            .AsNoTracking()
             .ToListAsync();
 
         var summary = entries
@@ -43,12 +55,21 @@ public class SummariesController : ControllerBase
     [HttpGet("weekly")]
     public async Task<ActionResult<WeeklySummary>> GetWeeklySummary([FromQuery] DateTime? weekStart)
     {
+        var userId = GetUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
         var startOfWeek = weekStart?.Date ?? DateTime.UtcNow.AddDays(-(int)DateTime.UtcNow.DayOfWeek).Date;
         var endOfWeek = startOfWeek.AddDays(7);
 
         var entries = await _context.WorkEntries
             .Where(we => we.StartTime >= startOfWeek && we.StartTime < endOfWeek && we.EndTime != null)
+            .Where(we => we.TaskItem.ProjectId.HasValue)
+            .Where(we => we.TaskItem.Project!.Members.Any(m => m.UserId == userId))
             .Include(we => we.TaskItem)
+            .AsNoTracking()
             .ToListAsync();
 
         var dailyHours = entries
@@ -78,6 +99,11 @@ public class SummariesController : ControllerBase
             DailyHours = dailyHours,
             TaskSummaries = taskSummaries
         };
+    }
+
+    private string? GetUserId()
+    {
+        return User.FindFirstValue(ClaimTypes.NameIdentifier);
     }
 }
 
