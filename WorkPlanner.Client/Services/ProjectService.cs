@@ -37,7 +37,14 @@ public class ProjectService
     public async Task<Project> CreateProjectAsync(CreateProjectRequest request)
     {
         var response = await _httpClient.PostAsJsonAsync("api/projects", request);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(body)
+                ? $"Create project failed: {response.StatusCode}"
+                : body);
+        }
+
         return await response.Content.ReadFromJsonAsync<Project>() ?? new Project();
     }
 

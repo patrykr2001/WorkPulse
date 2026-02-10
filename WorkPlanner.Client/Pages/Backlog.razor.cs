@@ -135,12 +135,20 @@ public partial class Backlog : ComponentBase, IDisposable
 
     protected string GetMemberLabel(ProjectMember member)
     {
-        if (!string.IsNullOrWhiteSpace(member.FullName))
+        var name = member.FullName?.Trim();
+        var email = member.Email?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(email))
         {
-            return member.FullName;
+            return $"{name} ({email})";
         }
 
-        return string.IsNullOrWhiteSpace(member.Email) ? member.UserId : member.Email;
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            return name;
+        }
+
+        return string.IsNullOrWhiteSpace(email) ? member.UserId : email;
     }
 
     private async Task LoadSprintDataAsync()

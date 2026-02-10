@@ -7,14 +7,15 @@
 @inject TaskService TaskDataService
 @inject AuthService AuthStateService
 @inject TaskCommentService CommentDataService
+@inject ISnackbar Snackbar
 
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="2">
             <MudText Typo="Typo.h6">@DialogTitle</MudText>
 
-            <MudTextField @bind-Value="TaskModel.Title" Label="Title" Required="true" />
-            <MudTextField @bind-Value="TaskModel.Description" Label="Description" Lines="10" />
+            <MudTextField @bind-Value="TaskModel.Title" Label="Title" Required="true" Immediate="true" />
+            <MudTextField @bind-Value="TaskModel.Description" Label="Description" Lines="10" Immediate="true" />
 
             <MudSelect T="int" Label="Project" @bind-Value="SelectedProjectId">
                 @foreach (var project in Projects)
@@ -74,8 +75,8 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">Save</MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="_isSaving">Save</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -92,6 +93,7 @@
     private List<Models.TaskStatus> AvailableStatuses { get; set; } = new();
     private List<TaskComment> Comments { get; set; } = new();
     private string NewCommentBody { get; set; } = string.Empty;
+    private bool _isSaving;
 
     private int SelectedProjectId
     {
@@ -153,6 +155,20 @@
             TaskModel.AssigneeId = AuthStateService.CurrentUser?.Id;
         }
 
+        if (!string.IsNullOrWhiteSpace(TaskModel.AssigneeId)
+            && Members.All(m => m.UserId != TaskModel.AssigneeId)
+            && AuthStateService.CurrentUser != null)
+        {
+            Members.Insert(0, new ProjectMember
+            {
+                UserId = AuthStateService.CurrentUser.Id,
+                Email = AuthStateService.CurrentUser.Email ?? string.Empty,
+                FirstName = AuthStateService.CurrentUser.FirstName,
+                LastName = AuthStateService.CurrentUser.LastName,
+                Role = ProjectRole.Member
+            });
+        }
+
         if (InitialTask != null)
         {
             Comments = await CommentDataService.GetCommentsAsync(InitialTask.Id);
@@ -168,34 +184,56 @@
             AvailableStatuses = new List<Models.TaskStatus> { Models.TaskStatus.Backlog };
             return;
         }
-
-        Sprints = await SprintDataService.GetSprintsAsync(TaskModel.ProjectId, includeArchived: false);
-        Members = await ProjectDataService.GetMembersAsync(TaskModel.ProjectId);
-        var project = Projects.FirstOrDefault(p => p.Id == TaskModel.ProjectId);
-        AvailableStatuses = TaskModel.SprintId == null
-            ? new List<Models.TaskStatus> { Models.TaskStatus.Backlog }
-            : GetAvailableStatuses(project?.EnabledStatuses);
-
-        if (TaskModel.SprintId.HasValue && Sprints.All(s => s.Id != TaskModel.SprintId.Value))
+        try
         {
-            TaskModel.SprintId = null;
-            TaskModel.Status = Models.TaskStatus.Backlog;
+            Sprints = await SprintDataService.GetSprintsAsync(TaskModel.ProjectId, includeArchived: false);
+            Members = await ProjectDataService.GetMembersAsync(TaskModel.ProjectId);
+            Members = Members
+                .OrderBy(m => string.IsNullOrWhiteSpace(m.FullName) ? m.Email : m.FullName)
+                .ToList();
+            var project = Projects.FirstOrDefault(p => p.Id == TaskModel.ProjectId);
+            AvailableStatuses = TaskModel.SprintId == null
+                ? new List<Models.TaskStatus> { Models.TaskStatus.Backlog }
+                : GetAvailableStatuses(project?.EnabledStatuses);
+
+            if (TaskModel.SprintId.HasValue && Sprints.All(s => s.Id != TaskModel.SprintId.Value))
+            {
+                TaskModel.SprintId = null;
+                TaskModel.Status = Models.TaskStatus.Backlog;
+            }
+
+            if (TaskModel.SprintId != null && TaskModel.Status == Models.TaskStatus.Backlog && AvailableStatuses.Count > 0)
+            {
+                TaskModel.Status = AvailableStatuses[0];
+            }
+            else if (TaskModel.SprintId == null && TaskModel.Status != Models.TaskStatus.Backlog)
+            {
+                TaskModel.Status = Models.TaskStatus.Backlog;
+            }
         }
-
-        if (TaskModel.SprintId != null && TaskModel.Status == Models.TaskStatus.Backlog && AvailableStatuses.Count > 0)
+        catch (Exception ex)
         {
-            TaskModel.Status = AvailableStatuses[0];
-        }
-        else if (TaskModel.SprintId == null && TaskModel.Status != Models.TaskStatus.Backlog)
-        {
-            TaskModel.Status = Models.TaskStatus.Backlog;
+            Snackbar.Add($"Failed to load project data: {ex.Message}", Severity.Error);
         }
     }
 
     private async Task Save()
     {
+        if (_isSaving)
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(TaskModel.Title) || TaskModel.ProjectId <= 0)
         {
+            if (string.IsNullOrWhiteSpace(TaskModel.Title))
+            {
+                Snackbar.Add("Task title is required.", Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add("Project is required to create a task.", Severity.Warning);
+            }
             return;
         }
 
@@ -204,16 +242,28 @@
             TaskModel.Status = Models.TaskStatus.Backlog;
         }
 
-        if (InitialTask == null)
+        _isSaving = true;
+        try
         {
-            await TaskDataService.CreateTaskAsync(TaskModel);
-        }
-        else
-        {
-            await TaskDataService.UpdateTaskAsync(TaskModel);
-        }
+            if (InitialTask == null)
+            {
+                await TaskDataService.CreateTaskAsync(TaskModel);
+            }
+            else
+            {
+                await TaskDataService.UpdateTaskAsync(TaskModel);
+            }
 
-        MudDialog.Close(DialogResult.Ok(true));
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save task: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private void Cancel()
@@ -228,12 +278,20 @@
 
     private string GetMemberLabel(ProjectMember member)
     {
-        if (!string.IsNullOrWhiteSpace(member.FullName))
+        var name = member.FullName?.Trim();
+        var email = member.Email?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(email))
         {
-            return member.FullName;
+            return $"{name} ({email})";
         }
 
-        return string.IsNullOrWhiteSpace(member.Email) ? member.UserId : member.Email;
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            return name;
+        }
+
+        return string.IsNullOrWhiteSpace(email) ? member.UserId : email;
     }
 
     private string GetCommentAuthorLabel(TaskComment comment)

@@ -50,7 +50,14 @@ public class TaskService
             SprintId = task.SprintId,
             Order = task.Order
         });
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(body)
+                ? $"Create task failed: {response.StatusCode}"
+                : body);
+        }
+
         return await response.Content.ReadFromJsonAsync<TaskItem>() ?? task;
     }
 
