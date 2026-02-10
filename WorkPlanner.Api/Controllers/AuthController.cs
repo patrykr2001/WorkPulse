@@ -29,8 +29,11 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
+            _logger.LogWarning("Registration attempt with invalid model state for {Email}", model.Email);
             return BadRequest(ModelState);
         }
+
+        _logger.LogInformation("Registration attempt for {Email}", model.Email);
 
         var user = new ApplicationUser
         {
@@ -46,7 +49,7 @@ public class AuthController : ControllerBase
         if (result.Succeeded)
         {
             await _userManager.AddToRoleAsync(user, Roles.User);
-            _logger.LogInformation("User created a new account with password.");
+            _logger.LogInformation("Registration succeeded for {Email}", model.Email);
 
             // Sign in the user after registration
             await _signInManager.SignInAsync(user, isPersistent: true);
@@ -56,6 +59,7 @@ public class AuthController : ControllerBase
 
         foreach (var error in result.Errors)
         {
+            _logger.LogWarning("Registration failed for {Email}. Error: {Error}", model.Email, error.Description);
             ModelState.AddModelError(string.Empty, error.Description);
         }
 
@@ -68,8 +72,11 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
+            _logger.LogWarning("Login attempt with invalid model state for {Email}", model.Email);
             return BadRequest(ModelState);
         }
+
+        _logger.LogInformation("Login attempt for {Email}", model.Email);
 
         var result = await _signInManager.PasswordSignInAsync(
             model.Email,
@@ -79,21 +86,23 @@ public class AuthController : ControllerBase
 
         if (result.Succeeded)
         {
-            _logger.LogInformation("User logged in.");
+            _logger.LogInformation("Login succeeded for {Email}", model.Email);
             return Ok(new { Message = "Login successful" });
         }
 
         if (result.RequiresTwoFactor)
         {
+            _logger.LogWarning("Login requires 2FA for {Email}", model.Email);
             return BadRequest(new { Message = "Two factor authentication required" });
         }
 
         if (result.IsLockedOut)
         {
-            _logger.LogWarning("User account locked out.");
+            _logger.LogWarning("User account locked out for {Email}", model.Email);
             return BadRequest(new { Message = "Account locked out" });
         }
 
+        _logger.LogWarning("Invalid login attempt for {Email}", model.Email);
         return BadRequest(new { Message = "Invalid login attempt" });
     }
 

@@ -6,14 +6,16 @@ namespace WorkPlanner.Client.Services;
 public class AuthService
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<AuthService> _logger;
     private UserInfo? _currentUser;
     private bool _isAuthenticated;
 
     public event Action? OnAuthStateChanged;
 
-    public AuthService(HttpClient httpClient)
+    public AuthService(HttpClient httpClient, ILogger<AuthService> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public bool IsAuthenticated => _isAuthenticated;
@@ -23,6 +25,7 @@ public class AuthService
     {
         try
         {
+            _logger.LogInformation("Login attempt for {Email}", email);
             var response = await _httpClient.PostAsJsonAsync("api/auth/login", new
             {
                 Email = email,
@@ -32,13 +35,17 @@ public class AuthService
 
             if (response.IsSuccessStatusCode)
             {
+                _logger.LogInformation("Login success for {Email}", email);
                 await RefreshUserAsync();
                 return true;
             }
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Login failed for {Email}. Status: {StatusCode}. Body: {Body}", email, response.StatusCode, responseBody);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Log error
+            _logger.LogError(ex, "Login request failed for {Email}", email);
         }
 
         return false;
@@ -48,17 +55,22 @@ public class AuthService
     {
         try
         {
+            _logger.LogInformation("Registration attempt for {Email}", model.Email);
             var response = await _httpClient.PostAsJsonAsync("api/auth/register", model);
 
             if (response.IsSuccessStatusCode)
             {
+                _logger.LogInformation("Registration success for {Email}", model.Email);
                 await RefreshUserAsync();
                 return true;
             }
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Registration failed for {Email}. Status: {StatusCode}. Body: {Body}", model.Email, response.StatusCode, responseBody);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Log error
+            _logger.LogError(ex, "Registration request failed for {Email}", model.Email);
         }
 
         return false;
@@ -68,11 +80,13 @@ public class AuthService
     {
         try
         {
+            _logger.LogInformation("Logout attempt");
             await _httpClient.PostAsync("api/auth/logout", null);
+            _logger.LogInformation("Logout success");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Log error
+            _logger.LogError(ex, "Logout request failed");
         }
         finally
         {
@@ -95,9 +109,9 @@ public class AuthService
                 return true;
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // User not authenticated
+            _logger.LogDebug(ex, "Refresh user failed or unauthorized");
         }
 
         _currentUser = null;
