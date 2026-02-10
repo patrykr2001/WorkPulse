@@ -6,9 +6,8 @@
 
 <MudStack Spacing="2">
     <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-        <MudTextField @bind-Value="NewProjectName" Label="New project name" Variant="Variant.Outlined" Margin="Margin.Dense" />
-        <MudTextField @bind-Value="NewProjectStatuses" Label="Statuses (comma-separated)" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Todo,InProgress,Done" />
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateProject">Create</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenCreateProjectDialog">New project</MudButton>
+        <MudTextField @bind-Value="SearchText" Label="Search" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
         <label class="mud-input-helper-text">Show archived</label>
         <input type="checkbox" @bind="ShowArchived" />
     </MudStack>
@@ -28,42 +27,16 @@
                 <MudTh></MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="Name">
-                    @if (EditingProjectId == context.Id)
-                    {
-                        <MudTextField @bind-Value="EditProjectName" Margin="Margin.Dense" />
-                    }
-                    else
-                    {
-                        @context.Name
-                    }
-                </MudTd>
+                <MudTd DataLabel="Name">@context.Name</MudTd>
                 <MudTd DataLabel="Owner">@GetOwnerLabel(context)</MudTd>
                 <MudTd DataLabel="Status">@(context.IsArchived ? "Archived" : "Active")</MudTd>
-                <MudTd DataLabel="Columns">
-                    @if (EditingProjectId == context.Id)
-                    {
-                        <MudTextField @bind-Value="EditProjectStatuses" Margin="Margin.Dense" Placeholder="Todo,InProgress,Done" />
-                    }
-                    else
-                    {
-                        @GetProjectStatuses(context)
-                    }
-                </MudTd>
+                <MudTd DataLabel="Columns">@GetProjectStatuses(context)</MudTd>
                 <MudTd>
-                    @if (EditingProjectId == context.Id)
-                    {
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="(() => SaveProject(context))">Save</MudButton>
-                        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="CancelEdit">Cancel</MudButton>
-                    }
-                    else
-                    {
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="(() => StartEdit(context))">Edit</MudButton>
-                        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="(() => ToggleArchive(context))">
-                            @(context.IsArchived ? "Unarchive" : "Archive")
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="(() => SelectProject(context))">Members</MudButton>
-                    }
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="(() => OpenEditProjectDialog(context))">Edit</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="(() => ToggleArchive(context))">
+                        @(context.IsArchived ? "Unarchive" : "Archive")
+                    </MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="(() => SelectProject(context))">Members</MudButton>
                 </MudTd>
             </RowTemplate>
         </MudTable>

@@ -1,0 +1,204 @@
+@namespace WorkPlanner.Client.Shared
+@using WorkPlanner.Client.Models
+@using TaskStatus = WorkPlanner.Client.Models.TaskStatus
+@using WorkPlanner.Client.Services
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@inject ProjectService ProjectService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">@DialogTitle</MudText>
+
+            <MudTextField @bind-Value="ProjectName" Label="Project name" Required="true" Immediate="true" />
+
+            <MudSelect T="WorkPlanner.Client.Models.TaskStatus" Label="Statuses" MultiSelection="true" SelectedValues="SelectedStatuses" SelectedValuesChanged="OnStatusesChanged">
+                @foreach (var status in StatusOptions)
+                {
+                    <MudSelectItem T="WorkPlanner.Client.Models.TaskStatus" Value="status">@GetStatusLabel(status)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="_isSaving">@SubmitLabel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public EventCallback OnSaved { get; set; }
+    [Parameter] public Project? Project { get; set; }
+
+    private string ProjectName { get; set; } = string.Empty;
+    private List<TaskStatus> SelectedStatuses { get; set; } = new()
+    {
+        TaskStatus.Todo,
+        TaskStatus.InProgress,
+        TaskStatus.Done
+    };
+    private bool _isSaving;
+    private bool _isEditMode;
+
+    private string DialogTitle => _isEditMode ? "Edit project" : "New project";
+    private string SubmitLabel => _isEditMode ? "Save" : "Create";
+
+    private static readonly List<TaskStatus> StatusOptions = new()
+    {
+        TaskStatus.Refine,
+        TaskStatus.Todo,
+        TaskStatus.InProgress,
+        TaskStatus.Review,
+        TaskStatus.Done
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (Project == null)
+        {
+            _isEditMode = false;
+            ProjectName = string.Empty;
+            SelectedStatuses = new List<TaskStatus>
+            {
+                TaskStatus.Todo,
+                TaskStatus.InProgress,
+                TaskStatus.Done
+            };
+            return;
+        }
+
+        _isEditMode = true;
+        ProjectName = Project.Name;
+        SelectedStatuses = ParseStatuses(Project.EnabledStatuses);
+        if (SelectedStatuses.Count == 0)
+        {
+            SelectedStatuses = new List<TaskStatus>
+            {
+                TaskStatus.Todo,
+                TaskStatus.InProgress,
+                TaskStatus.Done
+            };
+        }
+    }
+
+    private async Task Save()
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ProjectName))
+        {
+            Snackbar.Add("Project name is required.", Severity.Warning);
+            return;
+        }
+
+        var statuses = NormalizeStatuses(SelectedStatuses);
+        if (string.IsNullOrWhiteSpace(statuses))
+        {
+            statuses = "Todo,InProgress,Done";
+        }
+
+        _isSaving = true;
+        try
+        {
+            if (_isEditMode && Project != null)
+            {
+                await ProjectService.UpdateProjectAsync(Project.Id, new UpdateProjectRequest
+                {
+                    Name = ProjectName.Trim(),
+                    IsArchived = Project.IsArchived,
+                    EnabledStatuses = statuses
+                });
+            }
+            else
+            {
+                await ProjectService.CreateProjectAsync(new CreateProjectRequest
+                {
+                    Name = ProjectName.Trim(),
+                    EnabledStatuses = statuses
+                });
+            }
+
+            await OnSaved.InvokeAsync();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            var message = _isEditMode ? "Failed to update project" : "Failed to create project";
+            Snackbar.Add($"{message}: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void OnStatusesChanged(IEnumerable<TaskStatus> values)
+    {
+        SelectedStatuses = values.ToList();
+    }
+
+    private static List<TaskStatus> ParseStatuses(string? statuses)
+    {
+        if (string.IsNullOrWhiteSpace(statuses))
+        {
+            return new List<TaskStatus>();
+        }
+
+        return statuses
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => Enum.TryParse<TaskStatus>(s, true, out var value) ? value : (TaskStatus?)null)
+            .Where(v => v.HasValue && v.Value != TaskStatus.Backlog)
+            .Select(v => v!.Value)
+            .Distinct()
+            .ToList();
+    }
+
+    private static string NormalizeStatuses(IEnumerable<TaskStatus> statuses)
+    {
+        var normalized = statuses
+            .Where(status => status != TaskStatus.Backlog)
+            .Distinct()
+            .Select(status => status.ToString())
+            .ToList();
+
+        var order = new[]
+        {
+            TaskStatus.Refine.ToString(),
+            TaskStatus.Todo.ToString(),
+            TaskStatus.InProgress.ToString(),
+            TaskStatus.Review.ToString(),
+            TaskStatus.Done.ToString()
+        };
+
+        var allowed = new HashSet<string>(order, StringComparer.OrdinalIgnoreCase);
+        var sorted = normalized
+            .Where(allowed.Contains)
+            .Select(s => order.First(o => o.Equals(s, StringComparison.OrdinalIgnoreCase)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return string.Join(',', sorted);
+    }
+
+    private static string GetStatusLabel(TaskStatus status)
+    {
+        return status switch
+        {
+            TaskStatus.InProgress => "In Progress",
+            TaskStatus.Refine => "Refine",
+            TaskStatus.Review => "Review",
+            _ => status.ToString()
+        };
+    }
+}
